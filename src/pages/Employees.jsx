@@ -16,6 +16,34 @@ function Employees() {
       .order('created_at', { ascending: false })
     if (data) setEmployees(data)
     setLoading(false)
+  }async function sendOnboardingLink(emp) {
+    // Generate token
+    const token = crypto.randomUUID()
+    
+    // Save token to employee
+    await supabase
+      .from('employees')
+      .update({ 
+        onboarding_token: token,
+        onboarding_link_sent_at: new Date().toISOString()
+      })
+      .eq('id', emp.id)
+
+    // Call edge function
+    const { data, error } = await supabase.functions.invoke('send-onboarding-email', {
+      body: {
+        employee_name: `${emp.first_name} ${emp.last_name || ''}`.trim(),
+        employee_email: emp.personal_email,
+        onboarding_token: token,
+      }
+    })
+
+    if (error) {
+      alert('Error sending email: ' + error.message)
+    } else {
+      alert(`✅ Onboarding link sent to ${emp.personal_email}!`)
+      fetchEmployees()
+    }
   }
 
   return (
@@ -35,10 +63,11 @@ function Employees() {
 
       {view === 'list' && (
         <EmployeeList
-          employees={employees}
-          loading={loading}
-          onAdd={() => setView('add')}
-        />
+  employees={employees}
+  loading={loading}
+  onAdd={() => setView('add')}
+  onSendLink={sendOnboardingLink}
+/>
       )}
       {view === 'add' && (
         <AddEmployee
@@ -50,7 +79,7 @@ function Employees() {
 }
 
 // ── EMPLOYEE LIST ─────────────────────────────────────────────
-function EmployeeList({ employees, loading, onAdd }) {
+function EmployeeList({ employees, loading, onAdd, onSendLink }) {
   if (loading) return <p className="text-gray-400">Loading...</p>
 
   if (employees.length === 0) return (
@@ -87,6 +116,7 @@ function EmployeeList({ employees, loading, onAdd }) {
               <th className="px-4 py-3 text-left">State</th>
               <th className="px-4 py-3 text-left">Joining</th>
               <th className="px-4 py-3 text-left">Status</th>
+              <th className="px-4 py-3 text-left">Onboarding</th>
             </tr>
           </thead>
           <tbody>
@@ -107,6 +137,20 @@ function EmployeeList({ employees, loading, onAdd }) {
                   {emp.date_of_joining ? new Date(emp.date_of_joining).toLocaleDateString('en-IN') : '—'}
                 </td>
                 <td className="px-4 py-3">
+                    <td className="px-4 py-3">
+  {emp.status === 'onboarding' && (
+    <button
+      onClick={() => onSendLink(emp)}
+      className="bg-blue-900 text-white px-3 py-1 rounded text-xs hover:bg-blue-800 transition"
+    >
+      📧 Send Link
+    </button>
+  )}
+  {emp.onboarding_link_sent_at && (
+    <span className="text-green-600 text-xs">✅ Sent</span>
+  )}
+</td>
+        
                   <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${statusColor[emp.status] || 'bg-gray-100 text-gray-600'}`}>
                     {emp.status}
                   </span>
