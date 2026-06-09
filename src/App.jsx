@@ -3,6 +3,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Settings from './pages/Settings'
 import Employees from './pages/Employees'
+import Onboarding from './pages/Onboarding'
 import MainLayout from './layouts/MainLayout'
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
         <Route path="/dashboard" element={<MainLayout><Dashboard /></MainLayout>} />
         <Route path="/settings" element={<MainLayout><Settings /></MainLayout>} />
         <Route path="/employees" element={<MainLayout><Employees /></MainLayout>} />
+        <Route path="/onboarding" element={<MainLayout><Onboarding /></MainLayout>} />
       </Routes>
     </BrowserRouter>
   )
