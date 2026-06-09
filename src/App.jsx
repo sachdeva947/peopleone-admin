@@ -6,6 +6,7 @@ import Employees from './pages/Employees'
 import Onboarding from './pages/Onboarding'
 import SalaryStructure from './pages/SalaryStructure'
 import Payroll from './pages/Payroll'
+import Payslips from './pages/Payslips'
 import MainLayout from './layouts/MainLayout'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
         <Route path="/onboarding" element={<MainLayout><Onboarding /></MainLayout>} />
         <Route path="/salary" element={<MainLayout><SalaryStructure /></MainLayout>} />
         <Route path="/payroll" element={<MainLayout><Payroll /></MainLayout>} />
+        <Route path="/payslips" element={<MainLayout><Payslips /></MainLayout>} />
       </Routes>
     </BrowserRouter>
   )
