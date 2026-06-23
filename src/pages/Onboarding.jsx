@@ -19,17 +19,23 @@ function Onboarding() {
 
   function downloadTemplate() {
     const headers = [
-      'employee_code', 'first_name', 'last_name', 'mobile', 'personal_email',
-      'date_of_joining', 'designation', 'department', 'client_site_name',
-      'state_code', 'gross_monthly', 'basic_monthly', 'pan', 'uan_number',
-      'bank_account_no', 'bank_ifsc', 'gender', 'date_of_birth', 'father_name'
-    ]
+  'employee_code', 'first_name', 'last_name', 'mobile', 'personal_email',
+  'date_of_joining', 'designation', 'department', 'client_site_name',
+  'state_code', 'gross_monthly', 'basic_monthly', 'pan', 'uan_number',
+  'bank_account_no', 'bank_ifsc', 'bank_name', 'gender', 'date_of_birth',
+  'father_name', 'blood_group', 'work_experience', 'source',
+  'old_uan', 'old_esic_no', 'basic', 'hra', 'special_allowance',
+  'statutory_bonus'
+] 
     const sample = [
-      '', 'Rajesh', 'Kumar', '9876543210', 'rajesh@gmail.com',
-      '01-06-2026', 'Security Guard', 'Operations', 'Site Name Here',
-      'DL', '18000', '9000', 'ABCDE1234F', '',
-      '', '', 'male', '01-01-1990', 'Ram Kumar'
-    ]
+  '', 'Rajesh', 'Kumar', '9876543210', 'rajesh@gmail.com',
+  '01-06-2026', 'Security Guard', 'Operations', 'Site Name Here',
+  'DL', '24800', '15000', 'ABCDE1234F', '101234567890',
+  '36086124317', 'SBIN0016809', 'State Bank of India', 'male', '01-01-1990',
+  'Ram Kumar', 'B+', '2 Years', 'Reference',
+  '', '', '15000', '5200', '3350',
+  '1250'
+]
     const ws = XLSX.utils.aoa_to_sheet([headers, sample])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Employees')
@@ -75,24 +81,69 @@ function Onboarding() {
       )
       const empCode = row.employee_code || `EMP-${String((existingCount || 0) + i + 1).padStart(4, '0')}`
       const { error } = await supabase.from('employees').insert({
-        employee_code: empCode,
-        first_name: row.first_name,
-        last_name: row.last_name || null,
-        mobile: row.mobile?.toString(),
-        personal_email: row.personal_email,
-        date_of_joining: row.date_of_joining,
-        designation: row.designation || null,
-        department: row.department || null,
-        current_site_id: site?.id || null,
-        pan: row.pan || null,
-        uan_number: row.uan_number || null,
-        bank_account_no: row.bank_account_no || null,
-        bank_ifsc: row.bank_ifsc || null,
-        gender: row.gender || null,
-        father_name: row.father_name || null,
-        company_id: company?.id || null,
-        status: 'onboarding',
-      })
+          employee_code: empCode,
+  first_name: row.first_name,
+  last_name: row.last_name || null,
+  mobile: row.mobile?.toString(),
+  personal_email: row.personal_email,
+  date_of_joining: row.date_of_joining,
+  designation: row.designation || null,
+  department: row.department || null,
+  current_site_id: site?.id || null,
+  pan: row.pan || null,
+  uan_number: row.uan_number || null,
+  bank_account_no: row.bank_account_no || null,
+  bank_ifsc: row.bank_ifsc || null,
+  bank_name: row.bank_name || null,
+  gender: row.gender || null,
+  father_name: row.father_name || null,
+  date_of_birth: row.date_of_birth || null,
+  blood_group: row.blood_group || null,
+  work_experience: row.work_experience || null,
+  source: row.source || null,
+  old_uan: row.old_uan || null,
+  old_esic_no: row.old_esic_no || null,
+  company_id: company?.id || null,
+  status: 'onboarding',
+})
+if (!error && (row.basic || row.gross_monthly)) {
+  const gross = Number(row.gross_monthly) || 
+    (Number(row.basic) + Number(row.hra || 0) + 
+     Number(row.special_allowance || 0) + 
+     Number(row.statutory_bonus || 0))
+  
+  const basic = Number(row.basic) || Math.round(gross * 0.5)
+  const hra = Number(row.hra) || Math.round(basic * 0.4)
+  const specialAllowance = Number(row.special_allowance) || 0
+  const statutoryBonus = Number(row.statutory_bonus) || 0
+  
+  const pfEmp = Math.min(Math.round(basic * 0.12), 1800)
+  const esicEmp = gross <= 21000 ? Math.round(gross * 0.0075) : 0
+  const pfEr = Math.min(Math.round(basic * 0.12), 1800)
+  const esicEr = gross <= 21000 ? Math.round(gross * 0.0325) : 0
+  const inHand = gross - pfEmp - esicEmp
+
+  // Get inserted employee id
+  const { data: newEmp } = await supabase
+    .from('employees')
+    .select('id')
+    .eq('employee_code', empCode)
+    .single()
+
+  if (newEmp) {
+    await supabase.from('employee_salary').insert({
+      employee_id: newEmp.id,
+      effective_from: row.date_of_joining,
+      gross_monthly: gross,
+      ctc_annual: (gross + pfEr + esicEr) * 12,
+      basic,
+      hra,
+      special_allowance: specialAllowance,
+      statutory_bonus: statutoryBonus,
+      in_hand: inHand,
+    })
+  }
+}
       if (!error) { count++; setImported(count) }
     }
     setImporting(false)
