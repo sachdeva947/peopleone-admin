@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { generateOfferLetter } from '../lib/offerLetter'  
 
 function Employees() {
   const [view, setView] = useState('list') // 'list' | 'add'
@@ -67,6 +68,7 @@ function Employees() {
   loading={loading}
   onAdd={() => setView('add')}
   onSendLink={sendOnboardingLink}
+  onOfferLetter={generateOffer}
 />
       )}
       {view === 'add' && (
@@ -77,9 +79,31 @@ function Employees() {
     </div>
   )
 }
+async function generateOffer(emp) {
+  const { data: salary } = await supabase
+    .from('employee_salary')
+    .select('*')
+    .eq('employee_id', emp.id)
+    .is('effective_to', null)
+    .single()
 
+  const { data: site } = await supabase
+    .from('client_sites')
+    .select('site_name, state_code')
+    .eq('id', emp.current_site_id)
+    .single()
+
+  const { data: company } = await supabase
+    .from('companies')
+    .select('*')
+    .limit(1)
+    .single()
+
+  const empWithSite = { ...emp, site_name: site?.site_name }
+  generateOfferLetter(empWithSite, salary, company)
+}
 // ── EMPLOYEE LIST ─────────────────────────────────────────────
-function EmployeeList({ employees, loading, onAdd, onSendLink }) {
+function EmployeeList({ employees, loading, onAdd, onSendLink, onOfferLetter }) {
   if (loading) return <p className="text-gray-400">Loading...</p>
 
   if (employees.length === 0) return (
@@ -116,6 +140,7 @@ function EmployeeList({ employees, loading, onAdd, onSendLink }) {
               <th className="px-4 py-3 text-left">State</th>
               <th className="px-4 py-3 text-left">Joining</th>
               <th className="px-4 py-3 text-left">Status</th>
+              <th className="px-4 py-3 text-center">Offer Letter</th>
               <th className="px-4 py-3 text-left">Onboarding</th>
             </tr>
           </thead>
@@ -149,6 +174,14 @@ function EmployeeList({ employees, loading, onAdd, onSendLink }) {
   {emp.onboarding_link_sent_at && (
     <span className="text-green-600 text-xs">✅ Sent</span>
   )}
+</td>
+<td className="px-4 py-3 text-center">
+  <button
+    onClick={() => onOfferLetter(emp)}
+    className="bg-yellow-600 text-white px-3 py-1 rounded text-xs hover:bg-yellow-700 transition"
+  >
+    📄 Offer
+  </button>
 </td>
         
                   <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${statusColor[emp.status] || 'bg-gray-100 text-gray-600'}`}>
