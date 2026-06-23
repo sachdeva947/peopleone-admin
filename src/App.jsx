@@ -11,6 +11,7 @@ import Invoicing from './pages/Invoicing'
 import Placement from './pages/Placement'
 import Attendance from './pages/Attendance'
 import MainLayout from './layouts/MainLayout'
+import Compliance from './pages/Compliance'
 
 function App() {
   return (
