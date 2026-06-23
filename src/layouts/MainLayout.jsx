@@ -10,6 +10,7 @@ const menuItems = [
   { path: '/payroll',     label: 'Payroll',      icon: '💰' },
   { path: '/compliance',  label: 'Compliance',   icon: '📁' },
   { path: '/payslips',    label: 'Payslips',     icon: '🧾' },
+  { path: '/invoicing', label: 'Invoicing', icon: '🧾' },
   { path: '/accounting',  label: 'Accounting',   icon: '📒' },
   { path: '/reports',     label: 'Reports',      icon: '📈' },
   { path: '/settings',    label: 'Settings',     icon: '⚙️' },
