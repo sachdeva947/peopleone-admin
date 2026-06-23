@@ -8,6 +8,8 @@ import SalaryStructure from './pages/SalaryStructure'
 import Payroll from './pages/Payroll'
 import Payslips from './pages/Payslips'
 import Invoicing from './pages/Invoicing'
+import Placement from './pages/Placement'
+import Attendance from './pages/Attendance'
 import MainLayout from './layouts/MainLayout'
 
 function App() {
@@ -24,6 +26,9 @@ function App() {
         <Route path="/payroll" element={<MainLayout><Payroll /></MainLayout>} />
         <Route path="/payslips" element={<MainLayout><Payslips /></MainLayout>} />
         <Route path="/invoicing" element={<MainLayout><Invoicing /></MainLayout>} />
+        <Route path="/placement" element={<MainLayout><Placement /></MainLayout>} />
+        <Route path="/attendance" element={<MainLayout><Attendance /></MainLayout>} />
+        <Route path="/compliance" element={<MainLayout><Compliance /></MainLayout>} />
       </Routes>
     </BrowserRouter>
   )

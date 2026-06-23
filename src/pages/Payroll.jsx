@@ -58,10 +58,32 @@ function RunPayroll() {
     }
 
     // Calculate payroll for each
+    // Fetch attendance for this month
+const { data: attData } = await supabase
+  .from('attendance')
+  .select('*')
+  .eq('attendance_month', payrollMonth + '-01')
+
+const attMap = {}
+if (attData) {
+  attData.forEach(a => { attMap[a.employee_id] = a })
+}
     const results = emps.map(emp => {
-      const salary = emp.employee_salary[0]
-      const stateCode = emp.client_sites?.state_code || 'DL'
-      const calc = calculateEmployeePayroll(emp, salary, stateCode, payrollMonth + '-01')
+  const salary = emp.employee_salary[0]
+  const stateCode = emp.client_sites?.state_code || 'DL'
+  const empAtt = attMap[emp.id] || {
+    working_days: 26,
+    paid_days: 26,
+    lop_days: 0,
+    overtime_hours: 0,
+  }
+  const calc = calculateEmployeePayroll(
+    emp, salary, stateCode, payrollMonth + '-01',
+    {
+      workingDays: empAtt.working_days,
+      paidDays: empAtt.present_days || empAtt.working_days,
+    }
+  )
 
       return {
         employee_id: emp.id,

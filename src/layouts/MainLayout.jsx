@@ -7,6 +7,7 @@ const menuItems = [
   { path: '/employees',   label: 'Employees',   icon: '👥' },
   { path: '/onboarding',  label: 'Onboarding',  icon: '📋' },
   { path: '/salary', label: 'Salary', icon: '💵' },
+  { path: '/attendance', label: 'Attendance', icon: '📅' },
   { path: '/payroll',     label: 'Payroll',      icon: '💰' },
   { path: '/compliance',  label: 'Compliance',   icon: '📁' },
   { path: '/payslips',    label: 'Payslips',     icon: '🧾' },
