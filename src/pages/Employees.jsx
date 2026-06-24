@@ -46,15 +46,14 @@ function Employees() {
       alert(`✅ Onboarding link sent to ${emp.personal_email}!`)
       fetchEmployees()
     }
-  }{selectedEmp && (
-  <DocumentModal
-    employee={selectedEmp}
-    onClose={() => setSelectedEmp(null)}
-  />
-)}
-
+  }
   return (
-    <div>
+    <div>{selectedEmp && (
+      <DocumentModal
+        employee={selectedEmp}
+        onClose={() => setSelectedEmp(null)}
+      />
+    )}
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold text-gray-700">
@@ -75,6 +74,7 @@ function Employees() {
   onAdd={() => setView('add')}
   onSendLink={sendOnboardingLink}
   onOfferLetter={generateOffer}
+  onViewDocs={setSelectedEmp}
 />
       )}
       {view === 'add' && (
@@ -109,7 +109,7 @@ async function generateOffer(emp) {
   generateOfferLetter(empWithSite, salary, company)
 }
 // ── EMPLOYEE LIST ─────────────────────────────────────────────
-function EmployeeList({ employees, loading, onAdd, onSendLink, onOfferLetter }) {
+function EmployeeList({ employees, loading, onAdd, onSendLink, onOfferLetter, onViewDocs }) {
   if (loading) return <p className="text-gray-400">Loading...</p>
 
   if (employees.length === 0) return (
@@ -196,7 +196,7 @@ function EmployeeList({ employees, loading, onAdd, onSendLink, onOfferLetter }) 
       </td>
       <td className="px-4 py-3 text-center">
         <button
-          onClick={() => setSelectedEmp(emp)}
+          onClick={() => onViewDocs(emp)}
           className="bg-purple-600 text-white px-3 py-1 rounded text-xs hover:bg-purple-700 transition"
         >
           📁 Docs
