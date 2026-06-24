@@ -152,66 +152,59 @@ function EmployeeList({ employees, loading, onAdd, onSendLink, onOfferLetter }) 
             </tr>
           </thead>
           <tbody>
-            {employees.map((emp, i) => (
-  <tr key={emp.id} className={`border-b ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition`}>
-    <td className="px-4 py-3 font-mono text-xs text-gray-500">{emp.employee_code}</td>
-    <td className="px-4 py-3 font-medium text-gray-800">
-      {emp.first_name} {emp.last_name || ''}
-    </td>
-    <td className="px-4 py-3 text-gray-500">{emp.designation || '—'}</td>
-    <td className="px-4 py-3 text-gray-500">{emp.client_sites?.site_name || '—'}</td>
-    <td className="px-4 py-3">
-      {emp.client_sites?.state_code
-        ? <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">{emp.client_sites.state_code}</span>
-        : '—'}
-    </td>
-    <td className="px-4 py-3 text-gray-500">
-      {emp.date_of_joining ? new Date(emp.date_of_joining).toLocaleDateString('en-IN') : '—'}
-    </td>
-    <td className="px-4 py-3">
-      <div className="flex flex-col gap-1">
-        <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize w-fit ${statusColor[emp.status] || 'bg-gray-100 text-gray-600'}`}>
-          {emp.status}
-        </span>
-        {emp.onboarding_link_sent_at && (
-          <span className="text-green-600 text-xs">✅ Sent</span>
-        )}
-        {emp.status === 'onboarding' && (
-          <button
-            onClick={() => onSendLink(emp)}
-            className="bg-blue-900 text-white px-2 py-0.5 rounded text-xs hover:bg-blue-800 transition w-fit"
-          >
-            📧 Send Link
-          </button>
-        )}
-      </div>
-    </td>
-    <td className="px-4 py-3 text-center">
-      <button
-        onClick={() => onOfferLetter(emp)}
-        className="bg-yellow-600 text-white px-3 py-1 rounded text-xs hover:bg-yellow-700 transition"
-      >
-        📄 Offer
-      </button>
-    </td>
-    <td className="px-4 py-3 text-center">
-      <button
-        onClick={() => setSelectedEmp(emp)}
-        className="bg-purple-600 text-white px-3 py-1 rounded text-xs hover:bg-purple-700 transition"
-      >
-        📁 Docs
-      </button>
-    </td>
-  </tr>
-))}
-        
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${statusColor[emp.status] || 'bg-gray-100 text-gray-600'}`}>
-                    {emp.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
+  {employees.map((emp, i) => (
+    <tr key={emp.id} className={`border-b ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition`}>
+      <td className="px-4 py-3 font-mono text-xs text-gray-500">{emp.employee_code}</td>
+      <td className="px-4 py-3 font-medium text-gray-800">
+        {emp.first_name} {emp.last_name || ''}
+      </td>
+      <td className="px-4 py-3 text-gray-500">{emp.designation || '—'}</td>
+      <td className="px-4 py-3 text-gray-500">{emp.client_sites?.site_name || '—'}</td>
+      <td className="px-4 py-3">
+        {emp.client_sites?.state_code
+          ? <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">{emp.client_sites.state_code}</span>
+          : '—'}
+      </td>
+      <td className="px-4 py-3 text-gray-500">
+        {emp.date_of_joining ? new Date(emp.date_of_joining).toLocaleDateString('en-IN') : '—'}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex flex-col gap-1">
+          <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize w-fit ${statusColor[emp.status] || 'bg-gray-100 text-gray-600'}`}>
+            {emp.status}
+          </span>
+          {emp.onboarding_link_sent_at && (
+            <span className="text-green-600 text-xs">✅ Sent</span>
+          )}
+          {emp.status === 'onboarding' && (
+            <button
+              onClick={() => onSendLink(emp)}
+              className="bg-blue-900 text-white px-2 py-0.5 rounded text-xs hover:bg-blue-800 transition w-fit"
+            >
+              📧 Send Link
+            </button>
+          )}
+        </div>
+      </td>
+      <td className="px-4 py-3 text-center">
+        <button
+          onClick={() => onOfferLetter(emp)}
+          className="bg-yellow-600 text-white px-3 py-1 rounded text-xs hover:bg-yellow-700 transition"
+        >
+          📄 Offer
+        </button>
+      </td>
+      <td className="px-4 py-3 text-center">
+        <button
+          onClick={() => setSelectedEmp(emp)}
+          className="bg-purple-600 text-white px-3 py-1 rounded text-xs hover:bg-purple-700 transition"
+        >
+          📁 Docs
+        </button>
+      </td>
+    </tr>
+  ))}
+</tbody>
         </table>
       </div>
     </div>
