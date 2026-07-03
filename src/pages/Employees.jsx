@@ -459,22 +459,36 @@ function DocumentModal({ employee, onClose }) {
   }
 
   async function checkAllVerified() {
-    const mandatoryDocs = ['AADHAAR_FRONT', 'AADHAAR_BACK', 'PAN_CARD', 'PHOTO', 'CANCELLED_CHEQUE']
-    const { data } = await supabase
-      .from('employee_documents')
-      .select('doc_type_code, verification_status')
+  const mandatoryDocs = ['AADHAAR_FRONT', 'AADHAAR_BACK', 'PAN_CARD', 'PHOTO', 'CANCELLED_CHEQUE']
+
+  const { data } = await supabase
+    .from('employee_documents')
+    .select('doc_type_code, verification_status')
+    .eq('employee_id', employee.id)
+    .in('doc_type_code', mandatoryDocs)
+
+  if (!data) return
+
+  // Koi bhi rejected hai → deactivate karo
+  const anyRejected = data.some(d => d.verification_status === 'rejected')
+  if (anyRejected) {
+    await supabase
+      .from('employee_portal_users')
+      .update({ is_active: false })
       .eq('employee_id', employee.id)
-      .in('doc_type_code', mandatoryDocs)
-
-    const allVerified = mandatoryDocs.every(code =>
-      data?.some(d => d.doc_type_code === code && d.verification_status === 'verified')
-    )
-
-    if (allVerified) {
-      // Send welcome email + activate portal
-      await activatePortal()
-    }
+    alert('⚠️ Document rejected — portal access deactivated!')
+    return
   }
+
+  // Sab 5 verified hone chahiye
+  const allVerified = mandatoryDocs.every(code =>
+    data.some(d => d.doc_type_code === code && d.verification_status === 'verified')
+  )
+
+  if (allVerified) {
+    await activatePortal()
+  }
+}
 
   async function activatePortal() {
     // Generate reset token
