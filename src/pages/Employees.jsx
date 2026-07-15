@@ -506,7 +506,6 @@ function DocumentModal({ employee, onClose }) {
   if (allVerified) {
     await activatePortal()
   }
-}
 
   async function activatePortal() {
     // Generate reset token
