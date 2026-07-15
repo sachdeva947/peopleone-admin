@@ -1,681 +1,426 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
-import { generateOfferLetter } from '../lib/offerLetter'  
+import { useEffect, useState } from 'react'
+import { supabase } from '../supabaseClient'
 
-function Employees() {
-  const [view, setView] = useState('list') // 'list' | 'add'
-  const [selectedEmp, setSelectedEmp] = useState(null)
-  const [employees, setEmployees] = useState([])
-  const [loading, setLoading] = useState(true)
+// ─── Constants ───────────────────────────────────────────────
+const MANDATORY_DOCS = [
+  'AADHAAR_FRONT',
+  'AADHAAR_BACK',
+  'PAN_CARD',
+  'PHOTO',
+  'CANCELLED_CHEQUE',
+]
 
-  useEffect(() => { fetchEmployees() }, [])
+const DOC_LABELS = {
+  AADHAAR_FRONT:    'Aadhaar Front',
+  AADHAAR_BACK:     'Aadhaar Back',
+  PAN_CARD:         'PAN Card',
+  PHOTO:            'Passport Photo',
+  CANCELLED_CHEQUE: 'Cancelled Cheque',
+  OFFER_LETTER:     'Offer Letter',
+  EXPERIENCE_LETTER:'Experience Letter',
+  DEGREE_CERTIFICATE:'Degree Certificate',
+  OTHER:            'Other',
+}
+
+const STATUS_COLORS = {
+  active:     'bg-green-100 text-green-800',
+  onboarding: 'bg-yellow-100 text-yellow-800',
+  inactive:   'bg-red-100 text-red-800',
+  terminated: 'bg-gray-100 text-gray-700',
+}
+
+// ─── Main Component ───────────────────────────────────────────
+export default function Employees() {
+  const [employees, setEmployees]   = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [search, setSearch]         = useState('')
+  const [filterStatus, setFilter]   = useState('all')
+  const [selected, setSelected]     = useState(null)   // employee for DocumentModal
+  const [showAdd, setShowAdd]       = useState(false)
+
+  useEffect(() => {
+    fetchEmployees()
+  }, [])
 
   async function fetchEmployees() {
     setLoading(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('employees')
-      .select('*, client_sites(site_name, state_code)')
+      .select('*')
       .order('created_at', { ascending: false })
-    if (data) setEmployees(data)
+    if (!error) setEmployees(data || [])
     setLoading(false)
-  }async function sendOnboardingLink(emp) {
-    // Generate token
-    const token = crypto.randomUUID()
-    
-    // Save token to employee
-    await supabase
-      .from('employees')
-      .update({ 
-        onboarding_token: token,
-        onboarding_link_sent_at: new Date().toISOString()
-      })
-      .eq('id', emp.id)
-
-    // Call edge function
-    const { data, error } = await supabase.functions.invoke('send-onboarding-email', {
-      body: {
-        employee_name: `${emp.first_name} ${emp.last_name || ''}`.trim(),
-        employee_email: emp.personal_email,
-        onboarding_token: token,
-      }
-    })
-
-    if (error) {
-      alert('Error sending email: ' + error.message)
-    } else {
-      alert(`✅ Onboarding link sent to ${emp.personal_email}!`)
-      fetchEmployees()
-    }
   }
+
+  const filtered = employees.filter(e => {
+    const matchSearch =
+      e.name?.toLowerCase().includes(search.toLowerCase()) ||
+      e.employee_code?.toLowerCase().includes(search.toLowerCase()) ||
+      e.email?.toLowerCase().includes(search.toLowerCase())
+    const matchStatus = filterStatus === 'all' || e.status === filterStatus
+    return matchSearch && matchStatus
+  })
+
   return (
-    <div>{selectedEmp && (
-      <DocumentModal
-        employee={selectedEmp}
-        onClose={() => setSelectedEmp(null)}
-      />
-    )}
+    <div className="p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-700">
-          Employees {!loading && `(${employees.length})`}
-        </h2>
+        <h1 className="text-2xl font-bold text-gray-800">Employees</h1>
         <button
-          onClick={() => setView(view === 'list' ? 'add' : 'list')}
-          className="bg-blue-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition"
+          onClick={() => setShowAdd(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium"
         >
-          {view === 'list' ? '+ Add Employee' : '← Back to List'}
+          + Add Employee
         </button>
       </div>
 
-      {view === 'list' && (
-        <EmployeeList
-  employees={employees}
-  loading={loading}
-  onAdd={() => setView('add')}
-  onSendLink={sendOnboardingLink}
-  onOfferLetter={generateOffer}
-  onViewDocs={setSelectedEmp}
-/>
+      {/* Filters */}
+      <div className="flex gap-3 mb-4">
+        <input
+          type="text"
+          placeholder="Search name, code, email..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-72 focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <select
+          value={filterStatus}
+          onChange={e => setFilter(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+        >
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="onboarding">Onboarding</option>
+          <option value="inactive">Inactive</option>
+          <option value="terminated">Terminated</option>
+        </select>
+        <button
+          onClick={fetchEmployees}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm hover:bg-gray-50"
+        >
+          Refresh
+        </button>
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div className="text-center py-12 text-gray-500">Loading...</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 text-gray-400">No employees found.</div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                {['Code', 'Name', 'Designation', 'Department', 'DOJ', 'Status', 'Documents', 'Actions'].map(h => (
+                  <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600 uppercase text-xs tracking-wide">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-100">
+              {filtered.map(emp => (
+                <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 font-mono text-gray-600">{emp.employee_code || '—'}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
+                  <td className="px-4 py-3 text-gray-600">{emp.designation || '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{emp.department || '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{emp.date_of_joining || '—'}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[emp.status] || 'bg-gray-100 text-gray-600'}`}>
+                      {emp.status || 'unknown'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => setSelected(emp)}
+                      className="text-blue-600 hover:underline text-sm"
+                    >
+                      View Docs
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => setSelected(emp)}
+                      className="text-gray-500 hover:text-gray-700 text-sm"
+                    >
+                      ✏️ Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
-      {view === 'add' && (
-        <AddEmployee
-          onSuccess={() => { setView('list'); fetchEmployees() }}
+
+      {/* Document Modal */}
+      {selected && (
+        <DocumentModal
+          employee={selected}
+          onClose={() => { setSelected(null); fetchEmployees() }}
         />
       )}
     </div>
   )
 }
-async function generateOffer(emp) {
-  const { data: salary } = await supabase
-    .from('employee_salary')
-    .select('*')
-    .eq('employee_id', emp.id)
-    .is('effective_to', null)
-    .single()
 
-  const { data: site } = await supabase
-    .from('client_sites')
-    .select('site_name, state_code')
-    .eq('id', emp.current_site_id)
-    .single()
-
-  const { data: company } = await supabase
-    .from('companies')
-    .select('*')
-    .limit(1)
-    .single()
-
-  const empWithSite = { ...emp, site_name: site?.site_name }
-  generateOfferLetter(empWithSite, salary, company)
-}
-// ── EMPLOYEE LIST ─────────────────────────────────────────────
-function EmployeeList({ employees, loading, onAdd, onSendLink, onOfferLetter, onViewDocs }) {
-  if (loading) return <p className="text-gray-400">Loading...</p>
-
-  if (employees.length === 0) return (
-    <div className="bg-white rounded-2xl shadow p-12 text-center">
-      <p className="text-5xl mb-4">👥</p>
-      <p className="text-gray-500 text-lg mb-4">No employees yet</p>
-      <button
-        onClick={onAdd}
-        className="bg-blue-900 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-800"
-      >
-        + Add First Employee
-      </button>
-    </div>
-  )
-
-  const statusColor = {
-    active:      'bg-green-100 text-green-700',
-    onboarding:  'bg-yellow-100 text-yellow-700',
-    resigned:    'bg-red-100 text-red-700',
-    terminated:  'bg-red-100 text-red-700',
-    absconded:   'bg-gray-100 text-gray-600',
-  }
-
-  return (
-    <div className="bg-white rounded-2xl shadow overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 text-gray-600 border-b">
-              <th className="px-4 py-3 text-left">Emp Code</th>
-              <th className="px-4 py-3 text-left">Name</th>
-              <th className="px-4 py-3 text-left">Designation</th>
-              <th className="px-4 py-3 text-left">Site</th>
-              <th className="px-4 py-3 text-left">State</th>
-              <th className="px-4 py-3 text-left">Joining</th>
-              <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3 text-center">Offer Letter</th>
-              <th className="px-4 py-3 text-center">Documents</th>
-              <th className="px-4 py-3 text-left">Onboarding</th>
-            </tr>
-          </thead>
-          <tbody>
-  {employees.map((emp, i) => (
-    <tr key={emp.id} className={`border-b ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition`}>
-      <td className="px-4 py-3 font-mono text-xs text-gray-500">{emp.employee_code}</td>
-      <td className="px-4 py-3 font-medium text-gray-800">
-        {emp.first_name} {emp.last_name || ''}
-      </td>
-      <td className="px-4 py-3 text-gray-500">{emp.designation || '—'}</td>
-      <td className="px-4 py-3 text-gray-500">{emp.client_sites?.site_name || '—'}</td>
-      <td className="px-4 py-3">
-        {emp.client_sites?.state_code
-          ? <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">{emp.client_sites.state_code}</span>
-          : '—'}
-      </td>
-      <td className="px-4 py-3 text-gray-500">
-        {emp.date_of_joining ? new Date(emp.date_of_joining).toLocaleDateString('en-IN') : '—'}
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex flex-col gap-1">
-          <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize w-fit ${statusColor[emp.status] || 'bg-gray-100 text-gray-600'}`}>
-            {emp.status}
-          </span>
-          {emp.onboarding_link_sent_at && (
-            <span className="text-green-600 text-xs">✅ Sent</span>
-          )}
-          {emp.status === 'onboarding' && (
-            <button
-              onClick={() => onSendLink(emp)}
-              className="bg-blue-900 text-white px-2 py-0.5 rounded text-xs hover:bg-blue-800 transition w-fit"
-            >
-              📧 Send Link
-            </button>
-          )}
-        </div>
-      </td>
-      <td className="px-4 py-3 text-center">
-        <button
-          onClick={() => onOfferLetter(emp)}
-          className="bg-yellow-600 text-white px-3 py-1 rounded text-xs hover:bg-yellow-700 transition"
-        >
-          📄 Offer
-        </button>
-      </td>
-      <td className="px-4 py-3 text-center">
-        <button
-          onClick={() => onViewDocs(emp)}
-          className="bg-purple-600 text-white px-3 py-1 rounded text-xs hover:bg-purple-700 transition"
-        >
-          📁 Docs
-        </button>
-      </td>
-    </tr>
-  ))}
-</tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-// ── ADD EMPLOYEE FORM ─────────────────────────────────────────
-function AddEmployee({ onSuccess }) {
-  const [sites, setSites] = useState([])
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [form, setForm] = useState({
-    first_name: '', last_name: '', mobile: '', personal_email: '',
-    date_of_joining: '', designation: '', department: '',
-    current_site_id: '', pan: '', uan_number: '',
-    bank_name: '', bank_account_no: '', bank_ifsc: '',
-    gender: '', date_of_birth: '', father_name: '',
-  })
-
-  useEffect(() => {
-    async function fetchSites() {
-      const { data } = await supabase
-        .from('client_sites')
-        .select('id, site_name, state_code')
-        .eq('is_active', true)
-        .order('site_name')
-      if (data) setSites(data)
-    }
-    fetchSites()
-  }, [])
-
-  function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
-
-  async function handleSave() {
-    if (!form.first_name || !form.date_of_joining) return
-    setSaving(true)
-
-    // Generate employee code
-    const { count } = await supabase
-      .from('employees')
-      .select('*', { count: 'exact', head: true })
-
-    const empCode = `EMP-${String((count || 0) + 1).padStart(4, '0')}`
-
-    const { data: company } = await supabase
-      .from('companies')
-      .select('id')
-      .limit(1)
-      .single()
-
-    const insertData = {
-      first_name: form.first_name,
-      last_name: form.last_name || null,
-      mobile: form.mobile || null,
-      personal_email: form.personal_email || null,
-      date_of_joining: form.date_of_joining,
-      designation: form.designation || null,
-      department: form.department || null,
-      current_site_id: form.current_site_id || null,
-      pan: form.pan || null,
-      uan_number: form.uan_number || null,
-      bank_name: form.bank_name || null,
-      bank_account_no: form.bank_account_no || null,
-      bank_ifsc: form.bank_ifsc || null,
-      gender: form.gender || null,
-      date_of_birth: form.date_of_birth || null,
-      father_name: form.father_name || null,
-      aadhaar_last4: form.aadhaar_last4 || null,
-      employee_code: empCode,
-      company_id: company?.id || null,
-      status: 'onboarding',
-    }
-
-    const { error } = await supabase
-      .from('employees')
-      .insert(insertData)
-
-    if (error) {
-      console.error('Insert error:', error)
-      alert('Error: ' + error.message)
-    } else {
-      setSaved(true)
-      setTimeout(() => onSuccess(), 1500)
-    }
-    setSaving(false)
-
-    if (!error) {
-      setSaved(true)
-      setTimeout(() => onSuccess(), 1500)
-    }
-  }
-
-  const inputClass = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-
-  return (
-    <div className="bg-white rounded-2xl shadow p-6 max-w-3xl">
-      <h3 className="text-lg font-semibold text-gray-700 mb-6">Add New Employee</h3>
-
-      {/* Personal Details */}
-      <h4 className="text-sm font-semibold text-blue-900 uppercase tracking-wide mb-3">Personal Details</h4>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">First Name *</label>
-          <input name="first_name" value={form.first_name} onChange={handleChange} className={inputClass} placeholder="Rajesh" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Last Name</label>
-          <input name="last_name" value={form.last_name} onChange={handleChange} className={inputClass} placeholder="Kumar" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Gender</label>
-          <select name="gender" value={form.gender} onChange={handleChange} className={inputClass}>
-            <option value="">Select</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Date of Birth</label>
-          <input type="date" name="date_of_birth" value={form.date_of_birth} onChange={handleChange} className={inputClass} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Father's Name</label>
-          <input name="father_name" value={form.father_name} onChange={handleChange} className={inputClass} placeholder="Ram Kumar" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Mobile *</label>
-          <input name="mobile" value={form.mobile} onChange={handleChange} className={inputClass} placeholder="9876543210" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Personal Email</label>
-          <input name="personal_email" value={form.personal_email} onChange={handleChange} className={inputClass} placeholder="raj@gmail.com" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">PAN</label>
-          <input name="pan" value={form.pan} onChange={handleChange} className={inputClass} placeholder="ABCDE1234F" />
-        </div>
-      </div>
-      <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Aadhaar Last 4 Digits</label>
-          <input
-            name="aadhaar_last4"
-            value={form.aadhaar_last4}
-            onChange={handleChange}
-            className={inputClass}
-            placeholder="1234"
-            maxLength={4}
-          />
-        </div>
-
-      {/* Employment Details */}
-      <h4 className="text-sm font-semibold text-blue-900 uppercase tracking-wide mb-3">Employment Details</h4>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Date of Joining *</label>
-          <input type="date" name="date_of_joining" value={form.date_of_joining} onChange={handleChange} className={inputClass} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Designation</label>
-          <input name="designation" value={form.designation} onChange={handleChange} className={inputClass} placeholder="Security Guard" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Department</label>
-          <input name="department" value={form.department} onChange={handleChange} className={inputClass} placeholder="Operations" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Deployment Site</label>
-          <select name="current_site_id" value={form.current_site_id} onChange={handleChange} className={inputClass}>
-            <option value="">Select Site</option>
-            {sites.map(s => (
-              <option key={s.id} value={s.id}>{s.site_name} ({s.state_code})</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">UAN Number</label>
-          <input name="uan_number" value={form.uan_number} onChange={handleChange} className={inputClass} placeholder="101234567890" />
-        </div>
-      </div>
-
-      {/* Bank Details */}
-      <h4 className="text-sm font-semibold text-blue-900 uppercase tracking-wide mb-3">Bank Details</h4>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Bank Name</label>
-          <input name="bank_name" value={form.bank_name} onChange={handleChange} className={inputClass} placeholder="State Bank of India" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">Account Number</label>
-          <input name="bank_account_no" value={form.bank_account_no} onChange={handleChange} className={inputClass} placeholder="12345678901" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-600 mb-1">IFSC Code</label>
-          <input name="bank_ifsc" value={form.bank_ifsc} onChange={handleChange} className={inputClass} placeholder="SBIN0001234" />
-        </div>
-      </div>
-
-      {/* Save */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-blue-900 text-white px-8 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-800 transition disabled:opacity-50"
-        >
-          {saving ? 'Saving...' : 'Save Employee'}
-        </button>
-        {saved && <span className="text-green-600 text-sm">✅ Employee added!</span>}
-      </div>
-    </div>
-  )
-}
+// ─── Document Modal ───────────────────────────────────────────
 function DocumentModal({ employee, onClose }) {
-  const [docs, setDocs] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [updating, setUpdating] = useState(null)
+  const [docs, setDocs]         = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [selectedType, setSelectedType] = useState('AADHAAR_FRONT')
 
   useEffect(() => {
     fetchDocs()
-  }, [employee.id])
+  }, [])
 
   async function fetchDocs() {
-    const { data } = await supabase
+    setLoading(true)
+    const { data, error } = await supabase
       .from('employee_documents')
       .select('*')
       .eq('employee_id', employee.id)
-      .order('uploaded_at', { ascending: false })
-    if (data) setDocs(data)
+      .order('created_at', { ascending: false })
+    if (!error) setDocs(data || [])
     setLoading(false)
   }
 
-  async function updateStatus(docId, status, reason = '') {
-    setUpdating(docId)
+  // ── Upload ────────────────────────────────────────────────
+  async function handleUpload(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploading(true)
+
+    const ext = file.name.split('.').pop()
+    const path = `${employee.id}/${selectedType}_${Date.now()}.${ext}`
+
+    const { error: upErr } = await supabase.storage
+      .from('employee-documents')
+      .upload(path, file)
+
+    if (upErr) {
+      alert('Upload failed: ' + upErr.message)
+      setUploading(false)
+      return
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('employee-documents')
+      .getPublicUrl(path)
+
+    await supabase.from('employee_documents').insert({
+      employee_id:         employee.id,
+      doc_type_code:       selectedType,
+      doc_label:           DOC_LABELS[selectedType],
+      file_url:            urlData.publicUrl,
+      verification_status: 'pending',
+    })
+
+    setUploading(false)
+    fetchDocs()
+  }
+
+  // ── Verify / Reject ───────────────────────────────────────
+  async function updateDocStatus(docId, status) {
     await supabase
       .from('employee_documents')
-      .update({
-        verification_status: status,
-        verified: status === 'verified',
-        rejection_reason: reason || null,
-        verified_at: new Date().toISOString(),
-      })
+      .update({ verification_status: status, verified_at: new Date().toISOString() })
       .eq('id', docId)
-    setUpdating(null)
-    fetchDocs()
+    await fetchDocs()
+    await checkAllVerified()
+  }
 
-    // Check if all mandatory docs verified
-    if (status === 'verified') {
-      await checkAllVerified()
+  // ── Activate Portal ───────────────────────────────────────
+  async function activatePortal() {
+    // Check if portal user already exists
+    const { data: existing } = await supabase
+      .from('employee_portal_users')
+      .select('id')
+      .eq('employee_id', employee.id)
+      .maybeSingle()
+
+    if (existing) {
+      // Just re-activate
+      await supabase
+        .from('employee_portal_users')
+        .update({ is_active: true })
+        .eq('employee_id', employee.id)
+    } else {
+      // Create portal user
+      const tempPassword = Math.random().toString(36).slice(-8)
+      await supabase.from('employee_portal_users').insert({
+        employee_id: employee.id,
+        email:       employee.email,
+        password:    tempPassword,
+        is_active:   true,
+      })
+    }
+
+    // Mark employee active
+    await supabase
+      .from('employees')
+      .update({ status: 'active' })
+      .eq('id', employee.id)
+
+    alert('✅ Portal activated! Employee status set to Active.')
+    fetchDocs()
+  }
+
+  // ── Check All Verified ────────────────────────────────────
+  async function checkAllVerified() {
+    const { data } = await supabase
+      .from('employee_documents')
+      .select('doc_type_code, verification_status')
+      .eq('employee_id', employee.id)
+      .in('doc_type_code', MANDATORY_DOCS)
+
+    if (!data) return
+
+    // If any mandatory doc is rejected → deactivate
+    const anyRejected = data.some(d => d.verification_status === 'rejected')
+    if (anyRejected) {
+      await supabase
+        .from('employee_portal_users')
+        .update({ is_active: false })
+        .eq('employee_id', employee.id)
+      await supabase
+        .from('employees')
+        .update({ status: 'onboarding' })
+        .eq('id', employee.id)
+      alert('⚠️ Document rejected — portal deactivated. Employee moved to Onboarding.')
+      fetchDocs()
+      return
+    }
+
+    // If all mandatory docs are verified → activate
+    const allVerified = MANDATORY_DOCS.every(code =>
+      data.some(d => d.doc_type_code === code && d.verification_status === 'verified')
+    )
+
+    if (allVerified) {
+      await activatePortal()
     }
   }
 
-  async function checkAllVerified() {
-  const mandatoryDocs = ['AADHAAR_FRONT', 'AADHAAR_BACK', 'PAN_CARD', 'PHOTO', 'CANCELLED_CHEQUE']
+  // ── Render ────────────────────────────────────────────────
+  const mandatoryStatus = MANDATORY_DOCS.map(code => {
+    const doc = docs.find(d => d.doc_type_code === code)
+    return { code, label: DOC_LABELS[code], doc }
+  })
 
-  const { data } = await supabase
-    .from('employee_documents')
-    .select('doc_type_code, verification_status')
-    .eq('employee_id', employee.id)
-    .in('doc_type_code', mandatoryDocs)
-
-  if (!data) return
-
-  // Koi bhi rejected → portal deactivate
-  const anyRejected = data.some(d => d.verification_status === 'rejected')
-  if (anyRejected) {
-    await supabase
-      .from('employee_portal_users')
-      .update({ is_active: false })
-      .eq('employee_id', employee.id)
-
-    // Employee status back to onboarding
-    await supabase
-      .from('employees')
-      .update({ status: 'onboarding' })
-      .eq('id', employee.id)
-
-    alert('⚠️ Document rejected — portal deactivated. Employee must re-upload.')
-    fetchDocs()
-    return
-  }
-
-  // Sab 5 verified → activate
-  const allVerified = mandatoryDocs.every(code =>
-    data.some(d => d.doc_type_code === code && d.verification_status === 'verified')
-  )
-
-  if (allVerified) {
-    await activatePortal()
-  }
-}
-
-  // Sab 5 verified hone chahiye
-  const allVerified = mandatoryDocs.every(code =>
-    data.some(d => d.doc_type_code === code && d.verification_status === 'verified')
-  )
-
-  if (allVerified) {
-    await activatePortal()
-  }
-
-  async function activatePortal() {
-    // Generate reset token
-    const resetToken = crypto.randomUUID()
-    const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-
-    // Create portal user
-    await supabase.from('employee_portal_users').upsert({
-      employee_id: employee.id,
-      email: employee.personal_email,
-      is_active: true,
-      first_login: true,
-      reset_token: resetToken,
-      reset_token_expiry: expiry,
-    }, { onConflict: 'employee_id' })
-
-    // Send welcome email
-    await supabase.functions.invoke('send-welcome-email', {
-      body: {
-        employee_name: `${employee.first_name} ${employee.last_name || ''}`.trim(),
-        employee_email: employee.personal_email,
-        employee_code: employee.employee_code,
-        reset_token: resetToken,
-        portal_url: 'https://peopleone-employee.vercel.app',
-      }
-    })
-
-    alert(`✅ All documents verified! Welcome email sent to ${employee.personal_email}`)
-  }
-
-  async function getFileUrl(filePath) {
-    const { data } = await supabase.storage
-      .from('employee-documents')
-      .createSignedUrl(filePath, 60)
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
-  }
-
-  const statusColor = {
-    pending:  'bg-yellow-100 text-yellow-700',
-    verified: 'bg-green-100 text-green-700',
-    rejected: 'bg-red-100 text-red-700',
-  }
-
-  const mandatoryDocs = ['AADHAAR_FRONT', 'AADHAAR_BACK', 'PAN_CARD', 'PHOTO', 'CANCELLED_CHEQUE']
-  const allMandatoryVerified = mandatoryDocs.every(code =>
-    docs.some(d => d.doc_type_code === code && d.verification_status === 'verified')
-  )
+  const otherDocs = docs.filter(d => !MANDATORY_DOCS.includes(d.doc_type_code))
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-
-        {/* Header */}
-        <div className="bg-blue-900 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white rounded-t-2xl">
           <div>
-            <h3 className="font-semibold">
-              {employee.first_name} {employee.last_name || ''} — Documents
-            </h3>
-            <p className="text-blue-300 text-xs">{employee.employee_code}</p>
+            <h2 className="text-lg font-bold text-gray-900">Document Vault</h2>
+            <p className="text-sm text-gray-500">{employee.name} · {employee.employee_code}</p>
           </div>
-          <div className="flex items-center gap-3">
-            {allMandatoryVerified && (
-              <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                ✅ All Verified
-              </span>
-            )}
-            <button onClick={onClose} className="text-white hover:text-gray-300 text-xl">✕</button>
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[employee.status] || 'bg-gray-100 text-gray-600'}`}>
+              {employee.status}
+            </span>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none"
+            >
+              ×
+            </button>
           </div>
         </div>
 
-        <div className="p-6">
-          {loading ? (
-            <p className="text-gray-400 text-center py-8">Loading documents...</p>
-          ) : docs.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-5xl mb-3">📁</p>
-              <p className="text-gray-400">No documents uploaded yet.</p>
-              <p className="text-gray-300 text-sm mt-1">
-                Employee needs to complete onboarding first.
-              </p>
+        <div className="p-5 space-y-6">
+          {/* Upload Section */}
+          <div className="bg-gray-50 rounded-xl p-4 border border-dashed border-gray-300">
+            <p className="text-sm font-semibold text-gray-700 mb-3">Upload New Document</p>
+            <div className="flex gap-3 items-center flex-wrap">
+              <select
+                value={selectedType}
+                onChange={e => setSelectedType(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              >
+                {Object.entries(DOC_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+              <label className={`cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                {uploading ? 'Uploading...' : 'Choose File'}
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={handleUpload}
+                />
+              </label>
+              <span className="text-xs text-gray-400">PDF, JPG, PNG accepted</span>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {docs.map(doc => (
-                <div key={doc.id}
-                  className={`border rounded-xl p-4 ${
-                    doc.verification_status === 'verified' ? 'border-green-200 bg-green-50' :
-                    doc.verification_status === 'rejected' ? 'border-red-200 bg-red-50' :
-                    'border-gray-200'
-                  }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-700">{doc.doc_name}</p>
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColor[doc.verification_status] || 'bg-gray-100 text-gray-600'}`}>
-                          {doc.verification_status}
-                        </span>
-                        {mandatoryDocs.includes(doc.doc_type_code) && (
-                          <span className="text-red-400 text-xs">*mandatory</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {doc.file_name} • {doc.file_size_kb}KB
-                        {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-IN')}`}
-                      </p>
-                      {doc.rejection_reason && (
-                        <p className="text-xs text-red-500 mt-1">Reason: {doc.rejection_reason}</p>
-                      )}
-                    </div>
+          </div>
 
-                    <div className="flex items-center gap-2 ml-4">
-                      {/* View button */}
-                      {doc.file_url && (
-                        <button
-                          onClick={() => getFileUrl(doc.file_url)}
-                          className="bg-gray-100 text-gray-600 px-3 py-1 rounded text-xs hover:bg-gray-200">
-                          👁️ View
-                        </button>
-                      )}
+          {/* Mandatory Documents */}
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-3">
+              Mandatory Documents
+              <span className="ml-2 text-xs font-normal text-gray-400">
+                ({mandatoryStatus.filter(m => m.doc?.verification_status === 'verified').length}/{MANDATORY_DOCS.length} verified)
+              </span>
+            </p>
 
-                      {/* Verify button */}
-                      {doc.verification_status !== 'verified' && (
-                        <button
-                          onClick={() => updateStatus(doc.id, 'verified')}
-                          disabled={updating === doc.id}
-                          className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 disabled:opacity-50">
-                          {updating === doc.id ? '...' : '✅ Verify'}
-                        </button>
-                      )}
+            {loading ? (
+              <div className="text-center py-6 text-gray-400 text-sm">Loading...</div>
+            ) : (
+              <div className="space-y-2">
+                {mandatoryStatus.map(({ code, label, doc }) => (
+                  <DocRow
+                    key={code}
+                    label={label}
+                    doc={doc}
+                    onVerify={() => updateDocStatus(doc.id, 'verified')}
+                    onReject={() => updateDocStatus(doc.id, 'rejected')}
+                    onPending={() => updateDocStatus(doc.id, 'pending')}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
 
-                      {/* Reject button */}
-                      {doc.verification_status !== 'rejected' && (
-                        <button
-                          onClick={async () => {
-                            const reason = prompt('Rejection reason:')
-                            if (reason !== null) {
-                              await updateStatus(doc.id, 'rejected', reason)
-                            }
-                          }}
-                          disabled={updating === doc.id}
-                          className="bg-red-100 text-red-600 px-3 py-1 rounded text-xs hover:bg-red-200 disabled:opacity-50">
-                          ❌ Reject
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
+          {/* Other Documents */}
+          {otherDocs.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Other Documents</p>
+              <div className="space-y-2">
+                {otherDocs.map(doc => (
+                  <DocRow
+                    key={doc.id}
+                    label={DOC_LABELS[doc.doc_type_code] || doc.doc_label || doc.doc_type_code}
+                    doc={doc}
+                    onVerify={() => updateDocStatus(doc.id, 'verified')}
+                    onReject={() => updateDocStatus(doc.id, 'rejected')}
+                    onPending={() => updateDocStatus(doc.id, 'pending')}
+                  />
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Summary */}
-          {docs.length > 0 && (
-            <div className="mt-4 pt-4 border-t">
-              <div className="flex gap-4 text-sm">
-                <span className="text-yellow-600">
-                  ⏳ Pending: {docs.filter(d => d.verification_status === 'pending').length}
-                </span>
-                <span className="text-green-600">
-                  ✅ Verified: {docs.filter(d => d.verification_status === 'verified').length}
-                </span>
-                <span className="text-red-500">
-                  ❌ Rejected: {docs.filter(d => d.verification_status === 'rejected').length}
-                </span>
-              </div>
-              {!allMandatoryVerified && (
-                <p className="text-xs text-orange-500 mt-2">
-                  ⚠️ All 5 mandatory documents must be verified to activate employee portal.
-                </p>
-              )}
+          {/* Manual Activate Button */}
+          {employee.status !== 'active' && (
+            <div className="border-t pt-4">
+              <button
+                onClick={activatePortal}
+                className="bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-green-700"
+              >
+                ✅ Manually Activate Portal
+              </button>
+              <p className="text-xs text-gray-400 mt-1">
+                Use only if all documents are manually verified outside the system.
+              </p>
             </div>
           )}
         </div>
@@ -683,4 +428,76 @@ function DocumentModal({ employee, onClose }) {
     </div>
   )
 }
-export default Employees
+
+// ─── Doc Row ──────────────────────────────────────────────────
+function DocRow({ label, doc, onVerify, onReject, onPending }) {
+  const statusConfig = {
+    verified: { bg: 'bg-green-50 border-green-200',  badge: 'bg-green-100 text-green-800',  icon: '✅' },
+    rejected: { bg: 'bg-red-50 border-red-200',      badge: 'bg-red-100 text-red-800',      icon: '❌' },
+    pending:  { bg: 'bg-yellow-50 border-yellow-200',badge: 'bg-yellow-100 text-yellow-800',icon: '⏳' },
+  }
+
+  const cfg = doc ? (statusConfig[doc.verification_status] || statusConfig.pending) : null
+
+  if (!doc) {
+    return (
+      <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200">
+        <div className="flex items-center gap-2">
+          <span className="text-gray-300">📄</span>
+          <span className="text-sm text-gray-500">{label}</span>
+        </div>
+        <span className="text-xs text-gray-400 italic">Not uploaded</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`flex items-center justify-between p-3 rounded-lg border ${cfg.bg}`}>
+      <div className="flex items-center gap-2">
+        <span>{cfg.icon}</span>
+        <span className="text-sm font-medium text-gray-800">{label}</span>
+        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cfg.badge}`}>
+          {doc.verification_status}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {/* View */}
+        <a
+          href={doc.file_url}
+          target="_blank"
+          rel="noreferrer"
+          className="text-blue-600 hover:underline text-xs"
+        >
+          View
+        </a>
+
+        {/* Action buttons */}
+        {doc.verification_status !== 'verified' && (
+          <button
+            onClick={onVerify}
+            className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
+          >
+            Verify
+          </button>
+        )}
+        {doc.verification_status !== 'rejected' && (
+          <button
+            onClick={onReject}
+            className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600"
+          >
+            Reject
+          </button>
+        )}
+        {doc.verification_status !== 'pending' && (
+          <button
+            onClick={onPending}
+            className="bg-gray-400 text-white px-2 py-1 rounded text-xs hover:bg-gray-500"
+          >
+            Reset
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
