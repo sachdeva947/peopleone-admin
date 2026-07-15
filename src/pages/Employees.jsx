@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-mport { supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 
 // ─── Constants ───────────────────────────────────────────────
 const MANDATORY_DOCS = [
