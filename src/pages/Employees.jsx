@@ -469,16 +469,34 @@ function DocumentModal({ employee, onClose }) {
 
   if (!data) return
 
-  // Koi bhi rejected hai → deactivate karo
+  // Koi bhi rejected → portal deactivate
   const anyRejected = data.some(d => d.verification_status === 'rejected')
   if (anyRejected) {
     await supabase
       .from('employee_portal_users')
       .update({ is_active: false })
       .eq('employee_id', employee.id)
-    alert('⚠️ Document rejected — portal access deactivated!')
+
+    // Employee status back to onboarding
+    await supabase
+      .from('employees')
+      .update({ status: 'onboarding' })
+      .eq('id', employee.id)
+
+    alert('⚠️ Document rejected — portal deactivated. Employee must re-upload.')
+    fetchDocs()
     return
   }
+
+  // Sab 5 verified → activate
+  const allVerified = mandatoryDocs.every(code =>
+    data.some(d => d.doc_type_code === code && d.verification_status === 'verified')
+  )
+
+  if (allVerified) {
+    await activatePortal()
+  }
+}
 
   // Sab 5 verified hone chahiye
   const allVerified = mandatoryDocs.every(code =>
