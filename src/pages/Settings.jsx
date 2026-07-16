@@ -1,348 +1,326 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-function Settings() {
-  const [activeTab, setActiveTab] = useState('company')
-  
-  return (
-    <div>
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-gray-200">
-        {[
-          { key: 'company',  label: '🏢 Company' },
-          { key: 'sites',    label: '📍 Client Sites' },
-          { key: 'states',   label: '🗺️ State Config' },
-        ].map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition
-              ${activeTab === tab.key
-                ? 'border-blue-900 text-blue-900'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+const MODES = [
+  {
+    value: 'india_only',
+    label: 'India Only',
+    flag: '🇮🇳',
+    desc: 'Payrolling, Flexi, RPO, India billing (INR)',
+    color: 'orange',
+  },
+  {
+    value: 'us_only',
+    label: 'US Only',
+    flag: '🇺🇸',
+    desc: 'US Staffing, W2/C2C/1099, Timesheets (USD)',
+    color: 'blue',
+  },
+  {
+    value: 'both',
+    label: 'India + US',
+    flag: '🌐',
+    desc: 'All modules, multi-currency INR + USD',
+    color: 'purple',
+  },
+]
 
-      {/* Tab Content */}
-      {activeTab === 'company' && <CompanyForm />}
-      {activeTab === 'sites'   && <SitesForm />}
-      {activeTab === 'states'  && <StatesConfig />}
-    </div>
-  )
-}
+const TABS = ['Company Profile', 'Operating Mode', 'Currency & Tax']
 
-// ── COMPANY FORM ──────────────────────────────────────────────
-function CompanyForm() {
-  const [form, setForm] = useState({
-  name: '', legal_name: '', pan: '', tan: '',
-  cin: '', gstin: '', registered_address: '',
-  pf_establishment_id: '', pf_establishment_name: '', esic_code: ''
-})
-  const [loading, setLoading] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [companyId, setCompanyId] = useState(null)
+export default function Settings() {
+  const [tab, setTab]       = useState(0)
+  const [settings, setSettings] = useState(null)
+  const [form, setForm]     = useState({})
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved]   = useState(false)
+  const [fxRate, setFxRate] = useState(null)
+  const [fxLoading, setFxLoading] = useState(false)
 
-  useEffect(() => {
-    async function fetchCompany() {
-      const { data } = await supabase.from('companies').select('*').limit(1).single()
-      if (data) { setForm(data); setCompanyId(data.id) }
-    }
-    fetchCompany()
-  }, [])
+  useEffect(() => { fetchSettings() }, [])
 
-  async function handleSave() {
-    setLoading(true)
-    if (companyId) {
-      await supabase.from('companies').update(form).eq('id', companyId)
-    } else {
-      const { data } = await supabase.from('companies').insert(form).select().single()
-      if (data) setCompanyId(data.id)
-    }
-    setLoading(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
-  }
-
-  function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
-
-  return (
-    <div className="bg-white rounded-2xl shadow p-6 max-w-2xl">
-      <h3 className="text-lg font-semibold text-gray-700 mb-6">Company Master</h3>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {[
-          { name: 'name',                  label: 'Display Name',         placeholder: 'PeopleOne' },
-{ name: 'legal_name',            label: 'Legal Name',           placeholder: 'PeopleOne Staffing Pvt Ltd' },
-{ name: 'pan',                   label: 'PAN',                  placeholder: 'AABCP1234C' },
-{ name: 'tan',                   label: 'TAN',                  placeholder: 'DELA12345B' },
-{ name: 'cin',                   label: 'CIN',                  placeholder: 'U74900DL2024PTC...' },
-{ name: 'gstin',                 label: 'GSTIN',                placeholder: '07AABCP1234C1Z5' },
-{ name: 'pf_establishment_id',   label: 'PF Establishment ID',  placeholder: 'DLCPM0012345000' },
-{ name: 'pf_establishment_name', label: 'PF Establishment Name',placeholder: 'As registered with EPFO' },
-{ name: 'esic_code',             label: 'ESIC Code',            placeholder: '31-12345-101' },
-        ].map(field => (
-          <div key={field.name}>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
-              {field.label}
-            </label>
-            <input
-              type="text"
-              name={field.name}
-              value={form[field.name] || ''}
-              onChange={handleChange}
-              placeholder={field.placeholder}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        ))}
-
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-600 mb-1">
-            Registered Address
-          </label>
-          <textarea
-            name="registered_address"
-            value={form.registered_address || ''}
-            onChange={handleChange}
-            rows={3}
-            placeholder="Full registered address..."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
-
-      <div className="mt-6 flex items-center gap-4">
-        <button
-          onClick={handleSave}
-          disabled={loading}
-          className="bg-blue-900 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition disabled:opacity-50"
-        >
-          {loading ? 'Saving...' : 'Save Company'}
-        </button>
-        {saved && <span className="text-green-600 text-sm">✅ Saved successfully!</span>}
-      </div>
-    </div>
-  )
-}
-
-// ── SITES FORM ────────────────────────────────────────────────
-function SitesForm() {
-  const [sites, setSites] = useState([])
-  const [form, setForm] = useState({
-    site_name: '', client_name: '', city: '',
-    state_code: '', address: '', pincode: ''
-  })
-  const [loading, setLoading] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  const states = [
-    { code: 'DL', name: 'Delhi' },
-    { code: 'HR', name: 'Haryana' },
-    { code: 'KA', name: 'Karnataka' },
-    { code: 'UP', name: 'Uttar Pradesh' },
-    { code: 'MP', name: 'Madhya Pradesh' },
-    { code: 'TG', name: 'Telangana' },
-    { code: 'TN', name: 'Tamil Nadu' },
-    { code: 'AP', name: 'Andhra Pradesh' },
-    { code: 'MH', name: 'Maharashtra' },
-    { code: 'GJ', name: 'Gujarat' },
-    { code: 'OR', name: 'Odisha' },
-    { code: 'WB', name: 'West Bengal' },
-    { code: 'JH', name: 'Jharkhand' },
-  ]
-
-  useEffect(() => { fetchSites() }, [])
-
-  async function fetchSites() {
+  async function fetchSettings() {
     const { data } = await supabase
-      .from('client_sites')
+      .from('company_settings')
       .select('*')
-      .order('created_at', { ascending: false })
-    if (data) setSites(data)
+      .limit(1)
+      .single()
+    if (data) {
+      setSettings(data)
+      setForm(data)
+    }
+    fetchLiveFxRate()
   }
 
-  async function handleAdd() {
-    if (!form.site_name || !form.state_code) return
-    setLoading(true)
-    const { data: company } = await supabase.from('companies').select('id').limit(1).single()
-    await supabase.from('client_sites').insert({
-      ...form,
-      company_id: company?.id,
-      is_active: true
-    })
-    setForm({ site_name: '', client_name: '', city: '', state_code: '', address: '', pincode: '' })
-    setLoading(false)
+  async function fetchLiveFxRate() {
+    setFxLoading(true)
+    try {
+      const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=INR')
+      const data = await res.json()
+      setFxRate(data.rates?.INR)
+    } catch {
+      setFxRate(null)
+    }
+    setFxLoading(false)
+  }
+
+  async function save() {
+    setSaving(true)
+    const { id, created_at, ...payload } = form
+    if (settings?.id) {
+      await supabase.from('company_settings').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', settings.id)
+    } else {
+      await supabase.from('company_settings').insert(payload)
+    }
+    setSaving(false)
     setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
-    fetchSites()
+    setTimeout(() => setSaved(false), 2500)
+    fetchSettings()
+    // Reload page so Layout picks up new mode
+    window.dispatchEvent(new Event('company-settings-updated'))
+  }
+
+  const F = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const modeColor = {
+    india_only: 'border-orange-400 bg-orange-50',
+    us_only:    'border-blue-400 bg-blue-50',
+    both:       'border-purple-400 bg-purple-50',
   }
 
   return (
-    <div className="max-w-3xl">
-      {/* Add Site Form */}
-      <div className="bg-white rounded-2xl shadow p-6 mb-6">
-        <h3 className="text-lg font-semibold text-gray-700 mb-4">Add Client Site</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[
-            { name: 'site_name',    label: 'Site Name *',    placeholder: 'Amazon - Bhiwandi' },
-            { name: 'client_name',  label: 'Client Name',    placeholder: 'Amazon India Pvt Ltd' },
-            { name: 'city',         label: 'City',           placeholder: 'Bhiwandi' },
-            { name: 'pincode',      label: 'Pincode',        placeholder: '421302' },
-          ].map(field => (
-            <div key={field.name}>
-              <label className="block text-sm font-medium text-gray-600 mb-1">{field.label}</label>
-              <input
-                type="text"
-                value={form[field.name]}
-                onChange={e => setForm({ ...form, [field.name]: e.target.value })}
-                placeholder={field.placeholder}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          ))}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">State *</label>
-            <select
-              value={form.state_code}
-              onChange={e => setForm({ ...form, state_code: e.target.value })}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Select State</option>
-              {states.map(s => (
-                <option key={s.code} value={s.code}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-600 mb-1">Address</label>
-            <input
-              type="text"
-              value={form.address}
-              onChange={e => setForm({ ...form, address: e.target.value })}
-              placeholder="Full site address"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 flex items-center gap-4">
-          <button
-            onClick={handleAdd}
-            disabled={loading}
-            className="bg-blue-900 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 transition disabled:opacity-50"
-          >
-            {loading ? 'Adding...' : '+ Add Site'}
-          </button>
-          {saved && <span className="text-green-600 text-sm">✅ Site added!</span>}
-        </div>
+    <div className="p-6 max-w-3xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-gray-900">Settings</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Configure your company profile and operating mode</p>
       </div>
 
-      {/* Sites List */}
-      {sites.length > 0 && (
-        <div className="bg-white rounded-2xl shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">
-            Client Sites ({sites.length})
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-gray-600">
-                  <th className="px-4 py-2 text-left">Site Name</th>
-                  <th className="px-4 py-2 text-left">Client</th>
-                  <th className="px-4 py-2 text-left">City</th>
-                  <th className="px-4 py-2 text-left">State</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sites.map((site, i) => (
-                  <tr key={site.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-2 font-medium">{site.site_name}</td>
-                    <td className="px-4 py-2 text-gray-500">{site.client_name || '—'}</td>
-                    <td className="px-4 py-2 text-gray-500">{site.city || '—'}</td>
-                    <td className="px-4 py-2">
-                      <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-medium">
-                        {site.state_code}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+        {TABS.map((t, i) => (
+          <button key={t} onClick={() => setTab(i)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === i ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Tab 0: Company Profile ── */}
+      {tab === 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Company Name *</label>
+              <input value={form.company_name || ''} onChange={e => F('company_name', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. Acme Staffing Pvt Ltd" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Legal Name</label>
+              <input value={form.legal_name || ''} onChange={e => F('legal_name', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+              <input value={form.phone || ''} onChange={e => F('phone', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+              <input type="email" value={form.email || ''} onChange={e => F('email', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Website</label>
+              <input value={form.website || ''} onChange={e => F('website', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="https://..." />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
+              <textarea value={form.address || ''} onChange={e => F('address', e.target.value)}
+                rows={2}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
           </div>
         </div>
       )}
-    </div>
-  )
-}
 
-// ── STATES CONFIG ─────────────────────────────────────────────
-function StatesConfig() {
-  const [states, setStates] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function fetchStates() {
-      const { data } = await supabase
-        .from('state_compliance_config')
-        .select('*')
-        .order('state_name')
-      if (data) setStates(data)
-      setLoading(false)
-    }
-    fetchStates()
-  }, [])
-
-  if (loading) return <p className="text-gray-400">Loading...</p>
-
-  return (
-    <div className="bg-white rounded-2xl shadow p-6">
-      <h3 className="text-lg font-semibold text-gray-700 mb-4">
-        State Compliance Config ({states.length} states)
-      </h3>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 text-gray-600">
-              <th className="px-4 py-2 text-left">State</th>
-              <th className="px-4 py-2 text-center">PT</th>
-              <th className="px-4 py-2 text-left">PT Freq</th>
-              <th className="px-4 py-2 text-center">LWF</th>
-              <th className="px-4 py-2 text-left">LWF Freq</th>
-            </tr>
-          </thead>
-          <tbody>
-            {states.map((s, i) => (
-              <tr key={s.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                <td className="px-4 py-2 font-medium">{s.state_name}
-                  <span className="text-gray-400 text-xs ml-1">({s.state_code})</span>
-                </td>
-                <td className="px-4 py-2 text-center">
-                  {s.pt_applicable
-                    ? <span className="text-green-600 font-bold">✓</span>
-                    : <span className="text-red-400">✗</span>}
-                </td>
-                <td className="px-4 py-2 text-gray-500 capitalize">{s.pt_frequency || '—'}</td>
-                <td className="px-4 py-2 text-center">
-                  {s.lwf_applicable
-                    ? <span className="text-green-600 font-bold">✓</span>
-                    : <span className="text-red-400">✗</span>}
-                </td>
-                <td className="px-4 py-2 text-gray-500">{s.lwf_frequency || '—'}</td>
-              </tr>
+      {/* ── Tab 1: Operating Mode ── */}
+      {tab === 1 && (
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Choose your operating model. This controls which modules are visible in the sidebar.
+          </p>
+          <div className="space-y-3">
+            {MODES.map(m => (
+              <button key={m.value} onClick={() => F('operating_mode', m.value)}
+                className={`w-full text-left rounded-2xl border-2 p-4 transition-all ${
+                  form.operating_mode === m.value
+                    ? modeColor[m.value] + ' shadow-sm'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">{m.flag}</span>
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900">{m.label}</p>
+                    <p className="text-sm text-gray-500">{m.desc}</p>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                    form.operating_mode === m.value ? 'border-blue-600 bg-blue-600' : 'border-gray-300'
+                  }`}>
+                    {form.operating_mode === m.value && (
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    )}
+                  </div>
+                </div>
+              </button>
             ))}
-          </tbody>
-        </table>
+          </div>
+
+          {/* Module preview */}
+          <div className="bg-gray-50 rounded-xl p-4 mt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase mb-3">Visible Modules</p>
+            <div className="flex flex-wrap gap-2">
+              {getVisibleModules(form.operating_mode).map(m => (
+                <span key={m} className="px-2.5 py-1 bg-white border border-gray-200 rounded-full text-xs text-gray-700 shadow-sm">
+                  {m}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tab 2: Currency & Tax ── */}
+      {tab === 2 && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-6">
+          {/* Live FX Rate */}
+          {(form.operating_mode === 'us_only' || form.operating_mode === 'both') && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-blue-700 uppercase">Live Exchange Rate</p>
+                  <p className="text-2xl font-bold text-blue-900 mt-1">
+                    {fxLoading ? '...' : fxRate ? `1 USD = ₹${fxRate.toFixed(2)}` : `1 USD = ₹${form.usd_inr_fallback || 84}`}
+                  </p>
+                  <p className="text-xs text-blue-500 mt-0.5">
+                    {fxRate ? 'Live via frankfurter.app' : 'Using fallback rate'}
+                  </p>
+                </div>
+                <button onClick={fetchLiveFxRate}
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                  🔄 Refresh
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* India section */}
+            {(form.operating_mode === 'india_only' || form.operating_mode === 'both') && (
+              <>
+                <div className="col-span-2">
+                  <p className="text-xs font-semibold text-orange-600 uppercase mb-3">🇮🇳 India</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">GSTIN</label>
+                  <input value={form.gstin || ''} onChange={e => F('gstin', e.target.value.toUpperCase())}
+                    maxLength={15}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="27AABCT1332L1ZF" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">PAN</label>
+                  <input value={form.pan || ''} onChange={e => F('pan', e.target.value.toUpperCase())}
+                    maxLength={10}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="AABCT1332L" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">State Code</label>
+                  <input value={form.india_state_code || ''} onChange={e => F('india_state_code', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. 27" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">GST %</label>
+                  <input type="number" value={form.gst_percent ?? 18} onChange={e => F('gst_percent', +e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="gst_applicable" checked={form.gst_applicable ?? true}
+                    onChange={e => F('gst_applicable', e.target.checked)} className="rounded" />
+                  <label htmlFor="gst_applicable" className="text-sm text-gray-700">GST Applicable</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="tds_applicable" checked={form.tds_applicable ?? false}
+                    onChange={e => F('tds_applicable', e.target.checked)} className="rounded" />
+                  <label htmlFor="tds_applicable" className="text-sm text-gray-700">TDS Applicable</label>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Working Days / Month</label>
+                  <input type="number" value={form.working_days_month ?? 26} onChange={e => F('working_days_month', +e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </>
+            )}
+
+            {/* US section */}
+            {(form.operating_mode === 'us_only' || form.operating_mode === 'both') && (
+              <>
+                <div className="col-span-2 pt-2">
+                  <p className="text-xs font-semibold text-blue-600 uppercase mb-3">🇺🇸 United States</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">EIN</label>
+                  <input value={form.ein || ''} onChange={e => F('ein', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="12-3456789" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Primary State</label>
+                  <input value={form.us_state || ''} onChange={e => F('us_state', e.target.value.toUpperCase())}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. NJ, TX, CA" maxLength={2} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Fallback USD/INR Rate</label>
+                  <input type="number" value={form.usd_inr_fallback ?? 84} onChange={e => F('usd_inr_fallback', +e.target.value)}
+                    step="0.01"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <p className="text-xs text-gray-400 mt-1">Used if live rate is unavailable</p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Save button */}
+      <div className="mt-6 flex items-center gap-3">
+        <button onClick={save} disabled={saving}
+          className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+          {saving ? 'Saving...' : 'Save Settings'}
+        </button>
+        {saved && <span className="text-green-600 text-sm font-medium">✓ Saved!</span>}
+        {(form.operating_mode !== settings?.operating_mode) && (
+          <span className="text-orange-500 text-xs">⚠ Reload page after saving to update sidebar</span>
+        )}
       </div>
     </div>
   )
 }
 
-export default Settings
+function getVisibleModules(mode) {
+  const india = ['Dashboard', 'Employees', 'Onboarding', 'Attendance', 'Flexi Workers',
+                 'Clients', 'Contracts', 'Work Orders', 'Deployments', 'RPO Pipeline',
+                 'Payroll', 'Billing Recon', 'Invoicing', 'Compliance']
+  const us    = ['Dashboard', 'Clients', 'Work Orders', 'US Staffing',
+                 'Invoicing', 'Compliance']
+  const both  = [...new Set([...india, ...us])]
+  if (mode === 'india_only') return india
+  if (mode === 'us_only')    return us
+  return both
+}
