@@ -50,6 +50,12 @@ const NAV = [
       { path: '/revenue-leakage', label: 'Revenue Leakage', icon: '🔴', alert: true },
     ],
   },
+  {
+    section: null,
+    items: [
+      { path: '/settings', label: 'Settings', icon: '⚙️' },
+    ],
+  },
 ]
 
 // ─── Layout ───────────────────────────────────────────────────
@@ -250,6 +256,7 @@ function PageTitle({ pathname }) {
     '/invoicing':       'Invoicing',
     '/compliance':      'Compliance',
     '/revenue-leakage': 'Revenue Leakage',
+    '/settings':        'Settings',
   }
   return <h1 className="text-base font-semibold text-gray-800">{titles[pathname] || 'PeopleOne'}</h1>
 }
