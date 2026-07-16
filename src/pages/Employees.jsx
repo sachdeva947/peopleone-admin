@@ -54,7 +54,7 @@ export default function Employees() {
 
   const filtered = employees.filter(e => {
     const matchSearch =
-      e.name?.toLowerCase().includes(search.toLowerCase()) ||
+      `${e.first_name} ${e.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
       e.employee_code?.toLowerCase().includes(search.toLowerCase()) ||
       e.email?.toLowerCase().includes(search.toLowerCase())
     const matchStatus = filterStatus === 'all' || e.status === filterStatus
@@ -123,7 +123,7 @@ export default function Employees() {
               {filtered.map(emp => (
                 <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-mono text-gray-600">{emp.employee_code || '—'}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{emp.name}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">{emp.first_name} {emp.last_name}</td>
                   <td className="px-4 py-3 text-gray-600">{emp.designation || '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{emp.department || '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{emp.date_of_joining || '—'}</td>
@@ -225,12 +225,14 @@ function DocumentModal({ employee, onClose }) {
 
   // ── Verify / Reject ───────────────────────────────────────
   async function updateDocStatus(docId, status) {
-    await supabase
+    const { error } = await supabase
       .from('employee_documents')
       .update({ verification_status: status, verified_at: new Date().toISOString() })
       .eq('id', docId)
-    await fetchDocs()
+    if (error) { alert('Update failed: ' + error.message); return }
+    // checkAllVerified queries Supabase directly — no need to wait for state
     await checkAllVerified()
+    await fetchDocs()
   }
 
   // ── Activate Portal ───────────────────────────────────────
@@ -320,7 +322,7 @@ function DocumentModal({ employee, onClose }) {
         <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white rounded-t-2xl">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Document Vault</h2>
-            <p className="text-sm text-gray-500">{employee.name} · {employee.employee_code}</p>
+            <p className="text-sm text-gray-500">{employee.first_name} {employee.last_name} · {employee.employee_code}</p>
           </div>
           <div className="flex items-center gap-2">
             <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[employee.status] || 'bg-gray-100 text-gray-600'}`}>
