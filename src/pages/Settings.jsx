@@ -322,5 +322,5 @@ function getVisibleModules(mode) {
   const both  = [...new Set([...india, ...us])]
   if (mode === 'india_only') return india
   if (mode === 'us_only')    return us
-  return both
+  return both 
 }
