@@ -4,7 +4,6 @@ import Layout from './components/Layout'
 // ── Existing pages ──────────────────────────────────────────
 import Dashboard        from './pages/Dashboard'
 import Employees        from './pages/Employees'
-import Clients          from './pages/Clients'
 import Payroll          from './pages/Payroll'
 import Invoicing        from './pages/Invoicing'
 import Compliance       from './pages/Compliance'
@@ -41,7 +40,6 @@ export default function App() {
         <Route path="/flexi"          element={<Layout><FlexiStaffing /></Layout>} />
 
         {/* Clients & Contracts */}
-        <Route path="/clients"        element={<Layout><Clients /></Layout>} />
         <Route path="/contracts"      element={<Layout><ClientContracts /></Layout>} />
         <Route path="/work-orders"    element={<Layout><WorkOrders /></Layout>} />
 
