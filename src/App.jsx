@@ -6,6 +6,7 @@ import Dashboard        from './pages/Dashboard'
 import Employees        from './pages/Employees'
 import Payroll          from './pages/Payroll'
 import Invoicing        from './pages/Invoicing'
+import Clients from './pages/Clients'
 import Compliance       from './pages/Compliance'
 import Attendance       from './pages/Attendance'
 import Login            from './pages/Login'
@@ -40,6 +41,8 @@ export default function App() {
         <Route path="/flexi"          element={<Layout><FlexiStaffing /></Layout>} />
 
         {/* Clients & Contracts */}
+        <Route path="/clients"        element={<Layout><Clients /></Layout>} />
+        <Route path="/clients" element={<Layout><Clients /></Layout>} />
         <Route path="/contracts"      element={<Layout><ClientContracts /></Layout>} />
         <Route path="/work-orders"    element={<Layout><WorkOrders /></Layout>} />
 
